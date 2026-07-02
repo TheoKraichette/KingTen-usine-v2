@@ -12,13 +12,15 @@ fi
 chown -R usine:usine /home/usine/.claude
 chmod 600 /home/usine/.claude/.credentials.json 2>/dev/null || true
 
-# Socket Docker : accès par groupe (pas de chmod 666 — le socket est partagé avec tout l'hôte)
+# Socket Docker : accès par groupe + g+rw scopé (pas de chmod 666 — le socket est
+# partagé avec tout l'hôte, l'élargissement au monde persisterait après la sortie)
 if [ -S /var/run/docker.sock ]; then
     SOCK_GID=$(stat -c %g /var/run/docker.sock)
     if ! getent group "$SOCK_GID" >/dev/null 2>&1; then
         groupadd -g "$SOCK_GID" dockersock
     fi
     usermod -aG "$SOCK_GID" usine 2>/dev/null || true
+    chmod g+rw /var/run/docker.sock 2>/dev/null || true
 fi
 
 # Volumes montés : appartiennent à usine
