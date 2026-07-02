@@ -1,0 +1,24 @@
+/* Base sobre et moderne — l'agent dev étend selon l'outil. */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+    --primary: #4f46e5;
+    --primary-dark: #4338ca;
+    --bg: #f8fafc;
+    --text: #0f172a;
+    --muted: #64748b;
+    --card: #ffffff;
+    --border: #e2e8f0;
+}
+body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+.topbar { background: var(--card); border-bottom: 1px solid var(--border); padding: 0.8rem 1.2rem; }
+.brand { font-weight: 700; font-size: 1.2rem; color: var(--primary); }
+.container { max-width: 860px; margin: 2rem auto; padding: 0 1.2rem; }
+.hero { text-align: center; padding: 2rem 0; }
+.hero h1 { font-size: 2.2rem; margin-bottom: 0.6rem; }
+.hero p { color: var(--muted); }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.4rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+button { background: var(--primary); color: #fff; border: 0; border-radius: 8px; padding: 0.6rem 1.2rem; font-size: 1rem; cursor: pointer; }
+button:hover { background: var(--primary-dark); }
+input, select, textarea { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; margin-bottom: 0.9rem; }
+label { font-weight: 600; font-size: 0.9rem; display: block; margin-bottom: 0.3rem; }
+.result { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.9rem; margin-top: 1rem; }

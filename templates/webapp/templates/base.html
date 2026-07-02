@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{{ title }}{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+    <header class="topbar">
+        <nav>
+            <a href="/" class="brand">App</a>
+            <div class="nav-links">{% block nav %}{% endblock %}</div>
+        </nav>
+    </header>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

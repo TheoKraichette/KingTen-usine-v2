@@ -1,0 +1,6 @@
+tests/
+spec.json
+app.db
+__pycache__/
+*.pyc
+docker-compose.yml

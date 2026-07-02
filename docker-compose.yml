@@ -1,0 +1,23 @@
+services:
+  usine:
+    build: .
+    image: usine-v2
+    init: true  # tini en PID 1 : moissonne les zombies (Chromium tués par timeout)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./output:/app/output
+      - ./data:/app/data
+      # Home Claude persistant : les refresh de token OAuth survivent entre invocations
+      - ./data/claude:/home/usine/.claude
+      - ${CLAUDE_CREDENTIALS}:/creds/.credentials.json:ro
+    env_file: .env
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONIOENCODING: "utf-8"
+      USINE_DOCKER_NETWORK: usine-net
+    networks:
+      - usine-net
+
+networks:
+  usine-net:
+    name: usine-net

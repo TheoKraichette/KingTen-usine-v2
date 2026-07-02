@@ -1,0 +1,8 @@
+output/
+data/
+.env
+__pycache__/
+*.pyc
+.git/
+*.md
+!templates/**/*.md
