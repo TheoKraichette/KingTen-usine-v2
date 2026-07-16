@@ -3,7 +3,7 @@
 import hashlib
 import json
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -14,7 +14,7 @@ STEP_ORDER = ["discover", "product", "dev", "validate", "business", "package"]
 
 
 def utcnow() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def prompts_version() -> str:
@@ -55,7 +55,7 @@ class RunState(BaseModel):
         default_factory=lambda: {s: StepInfo() for s in STEP_ORDER}
     )
     session_ids: dict[str, str] = Field(default_factory=dict)  # étape -> session SDK (continuation)
-    agent_summaries: dict[str, str] = Field(default_factory=dict)  # dev / fix#N -> résumé de l'agent
+    agent_summaries: dict[str, str] = Field(default_factory=dict)  # dev / fix#N -> résumé
     smoke_hash: str = ""  # sha256 de tests/smoke.py après dev (détection d'affaiblissement)
     smoke_checks: int = 0  # nb de checks observés au dernier passage (interdit de diminuer)
     prompts_version: str = ""  # empreinte de prompts.py au lancement
@@ -172,7 +172,8 @@ class RunState(BaseModel):
     @property
     def duration_s(self) -> float:
         end = self.ended_at or utcnow()
-        return (datetime.fromisoformat(end) - datetime.fromisoformat(self.created_at)).total_seconds()
+        start = datetime.fromisoformat(self.created_at)
+        return (datetime.fromisoformat(end) - start).total_seconds()
 
 
 def dump_json(path: Path, data: dict | list) -> None:

@@ -10,14 +10,19 @@ Usine v2 — AI App Factory : génère des micro-SaaS complets via le Claude Age
 
 ```powershell
 docker compose build                                   # rebuild l'image usine
+docker compose run --rm usine doctor                   # diagnostic complet de l'environnement
 docker compose run --rm usine sdk-check                # test auth SDK + structured output
 docker compose run --rm usine run --count 2 --parallel 2
+docker compose run --rm usine status                   # runs en cours
 docker compose run --rm usine resume <run_id>
 docker compose run --rm usine report
 docker compose run --rm usine list
+.\check.ps1                                            # qualité : ruff + pytest dans Docker
 ```
 
 Tout tourne dans Docker — il n'y a **pas de Python sur l'hôte** (bloqué par une politique Windows). Pour tester du code Python : `docker compose run --rm --entrypoint python usine -c "..."`.
+
+Le source (`usine/`, `templates/`, `tests/`) est **monté en volume** dans le conteneur : les modifs de code sont actives sans rebuild. Rebuild uniquement si `requirements.txt`, le `Dockerfile` ou les versions épinglées changent. Lancer `.\check.ps1` (ruff + pytest) avant tout commit.
 
 ## Architecture
 
@@ -26,6 +31,7 @@ Tout tourne dans Docker — il n'y a **pas de Python sur l'hôte** (bloqué par 
 - `usine/agents.py` + `usine/prompts.py` — les 5 agents. discover/product/business = `run_structured()` (structured output, schémas dans `schemas.py`) ; dev/fix = `run_agentic()` (bypassPermissions, cwd = `output/run_<id>/code`).
 - `usine/sdk.py` — wrappers SDK : heartbeat, timeout par étape (non retryable), retry/backoff sur erreurs transitoires, extraction de la conso (`StepUsage`).
 - `usine/validation.py` — le cœur v2 : build → run (conteneur frère sur `usine-net`, joint par nom) → healthcheck → smoke génériques → `tests/smoke.py` de l'app → cleanup en `finally`. Aucun jugement de Claude.
+- `usine/doctor.py` — `doctor` (diagnostic complet, checks purs testables) + `preflight()` appelé avant run/resume (disques, daemon, credentials) : échec AVANT de dépenser des tokens.
 - `usine/state.py` — `RunState` pydantic, persisté à chaque étape ; `next_step()` pilote le resume.
 - `usine/db.py` — SQLite usine : historique des runs, idées (anti-duplication du discover), allocation de ports hôte uniques.
 - `templates/{webapp,api,static}/` — squelettes copiés au premier dev SEULEMENT (jamais recopiés au resume : le code de l'agent est préservé). **Contrat template** : port 8000, `/health` → strictement 200 (webapp/api), Dockerfile fonctionnel tel quel, `tests/smoke.py` (argv[1]=base_url, exit 0/1, une ligne OK/FAIL par check, minimum 2 + nb de parcours critiques — toute baisse du compte est un échec).

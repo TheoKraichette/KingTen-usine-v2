@@ -36,6 +36,14 @@ class ValidationFailed(RuntimeError):
     """Levée quand la validation échoue encore après le dernier cycle de fix."""
 
 
+_CHECK_LINE = re.compile(r"^(?:OK|FAIL)\b", re.MULTILINE)
+
+
+def count_checks(output: str) -> int:
+    """Nombre de lignes OK/FAIL imprimées par tests/smoke.py (contrat : une par check)."""
+    return len(_CHECK_LINE.findall(output))
+
+
 async def _docker(*args: str, timeout: int = 300) -> tuple[int, str]:
     """Exécute une commande docker, retourne (code, sortie combinée). 124 = timeout."""
     proc = await asyncio.create_subprocess_exec(
@@ -45,7 +53,7 @@ async def _docker(*args: str, timeout: int = 300) -> tuple[int, str]:
     )
     try:
         out, _ = await asyncio.wait_for(proc.communicate(), timeout)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         proc.kill()
         await proc.wait()
         return 124, f"timeout après {timeout}s: docker {' '.join(args)}"
@@ -83,12 +91,14 @@ async def ensure_infra(logger) -> None:
     if code != 0:
         code, out = await _docker("network", "create", settings.docker_network, timeout=30)
         if code != 0 and "already exists" not in out:
-            raise RuntimeError(f"infra: réseau {settings.docker_network} indisponible — {out.strip()[:300]}")
+            raise RuntimeError(
+                f"infra: réseau {settings.docker_network} indisponible — {out.strip()[:300]}"
+            )
         logger.info("🔌 réseau %s créé", settings.docker_network)
 
 
 def _run_is_active(run_id: str, threshold: int = 600) -> bool:
-    """Un run est actif si son run.log a bougé récemment (le heartbeat écrit toutes les 30-120 s)."""
+    """Un run est actif si son run.log a bougé récemment (heartbeat toutes les 30-120 s)."""
     log = Path(settings.output_dir) / f"run_{run_id}" / "run.log"
     return log.exists() and (time.time() - log.stat().st_mtime) < threshold
 
@@ -205,7 +215,7 @@ def _report(passed: bool, cycle: int, stages: list[dict], docker_logs_tail: str,
 
 
 async def _wait_healthy(name: str, base_url: str, stack: str | None) -> tuple[bool, str]:
-    """Attend que le conteneur soit sain. Contrat STRICT : /health → 200 (webapp/api), / → 200 (static)."""
+    """Attend un conteneur sain. Contrat STRICT : /health → 200 (webapp/api), / → 200 (static)."""
     probe_path = "/" if stack == "static" else "/health"
     deadline = time.time() + settings.healthcheck_timeout
     last = "inconnu"
@@ -272,7 +282,8 @@ async def _generic_smoke(state: RunState, base_url: str) -> tuple[bool, str]:
                     failures.append(f"{method} {path} (sonde {probe_path}) → {s}\n{r.text[:300]}")
             elif method == "GET" and not auth:
                 if s >= 500 or s == 404:
-                    failures.append(f"GET {path} → {s} (route déclarée: 404/5xx interdits)\n{r.text[:200]}")
+                    failures.append(f"GET {path} → {s} (route déclarée: 404/5xx interdits)\n"
+                                    f"{r.text[:200]}")
             else:
                 if s >= 500 or s in (404, 405):
                     failures.append(
@@ -300,7 +311,7 @@ async def _app_smoke(state: RunState, base_url: str, logger) -> tuple[bool, str]
     )
     try:
         out, _ = await asyncio.wait_for(proc.communicate(), settings.timeout_validate)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         try:
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
         except (ProcessLookupError, PermissionError):
@@ -310,7 +321,7 @@ async def _app_smoke(state: RunState, base_url: str, logger) -> tuple[bool, str]
     output = out.decode("utf-8", errors="replace")
     logger.debug("smoke.py sortie:\n%s", output)
 
-    checks = len(re.findall(r"^(?:OK|FAIL)\b", output, re.MULTILINE))
+    checks = count_checks(output)
     min_checks = 2 + len((state.spec or {}).get("critical_paths", []))
     if proc.returncode != 0:
         return False, f"tests/smoke.py exit {proc.returncode}\n{output}"

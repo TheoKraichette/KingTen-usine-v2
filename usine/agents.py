@@ -22,7 +22,7 @@ def smoke_file_hash(code_dir: Path) -> str:
 
 
 async def agent_discover(state: RunState, logger) -> StepUsage:
-    """Génère 5 idées scorées (anti-duplication via l'historique SQLite), sélectionne la meilleure."""
+    """Génère 5 idées scorées (anti-duplication via l'historique), sélectionne la meilleure."""
     past = db.past_ideas(state.category)
     logger.info("🔎 discover — catégorie: %s, %d idées passées exclues",
                 state.category or "libre", len(past))
@@ -61,7 +61,7 @@ async def agent_discover(state: RunState, logger) -> StepUsage:
 
 
 async def agent_product(state: RunState, logger) -> StepUsage:
-    """Spec produit structurée. Un stack forcé au CLI est imposé PAR LE SCHÉMA (cohérence garantie)."""
+    """Spec produit structurée. Un stack forcé au CLI est imposé PAR LE SCHÉMA."""
     logger.info("📋 product — spec de «%s»", state.idea["name"])
     schema = ProductSpec.model_json_schema()
     if state.stack:

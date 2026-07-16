@@ -36,6 +36,9 @@ RUN python -m playwright install --with-deps chromium \
     && chmod -R a+rX /ms-playwright \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Outillage qualité (layer léger, placé après les layers lourds pour préserver leur cache)
+RUN pip install --no-cache-dir ruff==0.15.21
+
 COPY . .
 
 # Utilisateur non-root (requis pour le mode bypassPermissions du SDK)
@@ -44,5 +47,9 @@ RUN useradd -m -s /bin/bash usine \
     && chmod +x /app/entrypoint.sh \
     && mkdir -p /app/output /app/data /home/usine/.claude \
     && chown -R usine:usine /app /home/usine/.claude
+
+# Toute la config du CLI Claude (y compris .claude.json, sinon dans ~) vit dans le volume
+# persistant : elle survit d'une invocation à l'autre au lieu d'être perdue à chaque conteneur
+ENV CLAUDE_CONFIG_DIR=/home/usine/.claude
 
 ENTRYPOINT ["/app/entrypoint.sh"]

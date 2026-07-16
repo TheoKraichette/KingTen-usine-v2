@@ -46,7 +46,8 @@ class Entity(BaseModel):
 class CriticalPath(BaseModel):
     name: str = Field(description="Nom du parcours, ex. 'signup-login-create'")
     steps: list[str] = Field(
-        description="Étapes UI concrètes et testables, ex. 'remplir #email avec test@x.fr et cliquer sur #btn-signup'"
+        description="Étapes UI concrètes et testables, ex. 'remplir #email avec "
+                    "test@x.fr et cliquer sur #btn-signup'"
     )
 
 
@@ -57,7 +58,8 @@ class ProductSpec(BaseModel):
     features: list[str] = Field(min_length=3, max_length=8)
     routes: list[Route]
     entities: list[Entity] = Field(default_factory=list)
-    pages: list[str] = Field(default_factory=list, description="Pages UI (chemins), vide pour stack api")
+    pages: list[str] = Field(default_factory=list,
+                             description="Pages UI (chemins), vide pour stack api")
     critical_paths: list[CriticalPath] = Field(min_length=1, max_length=3)
     notes: str = Field(default="", description="Contraintes techniques particulières")
 

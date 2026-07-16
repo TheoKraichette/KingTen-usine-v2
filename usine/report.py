@@ -35,7 +35,8 @@ def generate_report() -> str:
     lines = [
         "# Usine v2 — Rapport des runs",
         "",
-        "*Le coût est l'équivalent tarif API : rien n'est facturé, la conso est décomptée de l'abonnement.*",
+        "*Le coût est l'équivalent tarif API : rien n'est facturé, la conso est "
+        "décomptée de l'abonnement.*",
         "",
         "| Run | App | Statut | Stack | Catégorie | Durée | Coût équiv. API "
         "| Tokens in/cache-r/out | Fix | Val. | App |",
@@ -76,7 +77,8 @@ def generate_report() -> str:
             return
         lines.append(f"## Par {title}")
         lines.append("")
-        lines.append(f"| {title.capitalize()} | Runs | Réussite | Coût moyen | Durée moyenne | Fix moyens |")
+        lines.append(f"| {title.capitalize()} | Runs | Réussite | Coût moyen "
+                     "| Durée moyenne | Fix moyens |")
         lines.append("|---|---|---|---|---|---|")
         for key, rows in sorted(groups.items()):
             done = [r for r in rows if r["status"] == "completed"]

@@ -1,4 +1,4 @@
-"""Commandes CLI : run, resume (unitaire ou --all), report, list, clean, delete, open, stop."""
+"""Commandes CLI : run, resume, status, report, list, clean, delete, open, stop."""
 
 import asyncio
 import json
@@ -10,6 +10,7 @@ from pathlib import Path
 
 from usine import db
 from usine.config import settings
+from usine.doctor import UsineNotReady, preflight
 from usine.logging_setup import run_logger
 from usine.pipeline import execute_run
 from usine.prompts import CATEGORIES
@@ -29,10 +30,12 @@ def _is_stale(run_id: str, threshold: int = 300) -> bool:
 # ── run ──────────────────────────────────────────────────────
 async def _run_many(count: int, parallel: int, category: str | None, stack: str | None,
                     budget: float) -> list[RunState]:
+    await preflight(logger)
     await sweep_orphans(logger)
     sem = asyncio.Semaphore(parallel)
     spent = {"usd": 0.0}
-    # Catégories distinctes par run concurrent (limite les idées dupliquées entre discovers simultanés)
+    # Catégories distinctes par run concurrent : limite les idées dupliquées
+    # entre discovers simultanés
     cats = random.sample(CATEGORIES, k=min(count, len(CATEGORIES)))
 
     async def one(idx: int) -> RunState | None:
@@ -68,18 +71,29 @@ def cmd_run(count: int, parallel: int | None, category: str | None, stack: str |
     parallel = parallel or settings.parallel
     if dry_run:
         cats = category or f"tirées de {len(CATEGORIES)} catégories (distinctes par run)"
+        models = (f"discover={settings.model_discover} product={settings.model_product} "
+                  f"dev={settings.model_dev} fix={settings.model_fix} "
+                  f"business={settings.model_business}")
+        timeouts = (f"discover={settings.timeout_discover} product={settings.timeout_product} "
+                    f"dev={settings.timeout_dev} fix={settings.timeout_fix} "
+                    f"validate={settings.timeout_validate}")
+        cap = f"${settings.max_cost_per_run:.2f}" if settings.max_cost_per_run else "aucun"
         print(f"""Plan d'exécution (--dry-run, rien n'est lancé) :
   runs          : {count} (parallélisme {parallel})
   catégorie     : {cats}
   stack         : {stack or 'au choix de l’agent product'}
-  modèles       : discover={settings.model_discover} product={settings.model_product} dev={settings.model_dev} fix={settings.model_fix} business={settings.model_business}
-  timeouts (s)  : discover={settings.timeout_discover} product={settings.timeout_product} dev={settings.timeout_dev} fix={settings.timeout_fix} validate={settings.timeout_validate}
-  budget batch  : {f'${budget:.2f}' if budget else 'aucun'} · plafond/run : {f'${settings.max_cost_per_run:.2f}' if settings.max_cost_per_run else 'aucun'}
+  modèles       : {models}
+  timeouts (s)  : {timeouts}
+  budget batch  : {f'${budget:.2f}' if budget else 'aucun'} · plafond/run : {cap}
   estimation    : ~$2.5-5.5 équiv. API et ~15-40 min par run (constaté sur les runs passés)""")
         return 0
     logger.info("═══ Usine v2 — %d run(s), parallélisme %d%s ═══",
                 count, parallel, f", budget ${budget:.2f}" if budget else "")
-    states = asyncio.run(_run_many(count, parallel, category, stack, budget))
+    try:
+        states = asyncio.run(_run_many(count, parallel, category, stack, budget))
+    except UsineNotReady as e:
+        logger.error("⛔ préflight échoué — aucun run lancé : %s", e)
+        return 2
 
     logger.info("")
     logger.info("═══ Bilan ═══")
@@ -87,7 +101,8 @@ def cmd_run(count: int, parallel: int | None, category: str | None, stack: str |
     for s in states:
         if s.status == "completed":
             ok += 1
-            logger.info("✅ %s (%s) — port %s — output/run_%s/", s.run_id, s.label, s.host_port, s.run_id)
+            logger.info("✅ %s (%s) — port %s — output/run_%s/",
+                        s.run_id, s.label, s.host_port, s.run_id)
         else:
             failed_step = next((n for n, i in s.steps.items() if i.status == "failed"), "?")
             logger.info("❌ %s (%s) — échec à l'étape %s — voir output/run_%s/RAPPORT_ECHEC.md",
@@ -120,10 +135,15 @@ def _resume_one(run_id: str, force: bool = False) -> RunState | None:
         state.save()
     rlog = run_logger(state.run_id, state.run_dir)
     rlog.info("🔄 reprise à l'étape «%s»", step)
-    return asyncio.run(_resume_async(state, rlog))
+    try:
+        return asyncio.run(_resume_async(state, rlog))
+    except UsineNotReady as e:
+        logger.error("⛔ préflight échoué — reprise annulée : %s", e)
+        return None
 
 
 async def _resume_async(state: RunState, rlog) -> RunState:
+    await preflight(logger)
     await sweep_orphans(logger)
     return await execute_run(state, rlog)
 
@@ -180,6 +200,47 @@ def cmd_list() -> int:
     return 0
 
 
+# ── status ───────────────────────────────────────────────────
+def _last_log_line(log: Path) -> str:
+    if not log.exists():
+        return ""
+    try:
+        lines = log.read_text(encoding="utf-8", errors="replace").strip().splitlines()
+    except OSError:
+        return ""
+    return lines[-1][:150] if lines else ""
+
+
+def cmd_status() -> int:
+    """Vue temps réel des runs en cours : étape, durée, coût, dernière activité du log."""
+    rows = [r for r in db.list_runs() if r["status"] == "running"]
+    if not rows:
+        print("Aucun run en cours.")
+        return 0
+    now = time.time()
+    for r in rows:
+        run_id = r["run_id"]
+        log = Path(settings.output_dir) / f"run_{run_id}" / "run.log"
+        try:
+            state = RunState.load(run_id)
+            step = next((n for n, i in state.steps.items() if i.status == "running"),
+                        state.next_step() or "?")
+            elapsed, cost = state.duration_s, state.total_cost_usd
+        except FileNotFoundError:
+            step, elapsed, cost = "?", r["duration_s"] or 0.0, r["cost_usd"] or 0.0
+        if not log.exists():
+            icon, live = "⏳", "pas encore de log"
+        elif (age := int(now - log.stat().st_mtime)) > 300:
+            icon, live = "💀", f"log muet depuis {age // 60} min — interrompu ? (resume {run_id})"
+        else:
+            icon, live = "⏳", f"log actif il y a {age}s"
+        print(f"{icon} {run_id}  {(r['label'] or '—'):<32} étape {step:<9} "
+              f"{int(elapsed) // 60:>3}m  ${cost:.2f}  {live}")
+        if last := _last_log_line(log):
+            print(f"   └ {last}")
+    return 0
+
+
 # ── clean / delete ───────────────────────────────────────────
 def cmd_clean() -> int:
     asyncio.run(sweep_orphans(logger))
@@ -202,7 +263,8 @@ def cmd_delete(run_id: str, keep_ideas: bool = False) -> int:
 
 async def _delete_docker(run_id: str) -> None:
     await _docker("rm", "-f", container_name(run_id), f"usine-live-{run_id}", timeout=60)
-    await _docker("rmi", "-f", f"usine-app-{run_id}:latest", f"usine-live-{run_id}:latest", timeout=60)
+    await _docker("rmi", "-f", f"usine-app-{run_id}:latest", f"usine-live-{run_id}:latest",
+                  timeout=60)
 
 
 # ── open / stop ──────────────────────────────────────────────

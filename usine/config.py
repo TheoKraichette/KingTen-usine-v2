@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     # Garde-fous coût (0 = désactivé) — coût équivalent API, décompté de l'abonnement
     max_cost_per_run: float = 0.0
 
+    # Seuils disque en Go libres (préflight/doctor). Hôte = C: (le vhdx Docker y grossit,
+    # containerd crashe en SIGBUS quand il est plein) ; VM = espace interne Docker.
+    host_disk_warn_gb: float = 5.0
+    host_disk_min_gb: float = 1.5
+    vm_disk_warn_gb: float = 10.0
+    vm_disk_min_gb: float = 3.0
+
     # Chemins & infra (dans le conteneur)
     output_dir: str = "/app/output"
     data_dir: str = "/app/data"

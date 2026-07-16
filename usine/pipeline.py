@@ -10,7 +10,12 @@ import shutil
 
 from usine import db
 from usine.agents import (
-    agent_business, agent_dev, agent_discover, agent_fix, agent_product, smoke_file_hash,
+    agent_business,
+    agent_dev,
+    agent_discover,
+    agent_fix,
+    agent_product,
+    smoke_file_hash,
 )
 from usine.config import settings
 from usine.sdk import StepUsage
@@ -94,11 +99,14 @@ async def step_package(state: RunState, logger) -> None:
 
     idea = state.idea or {}
     validation = state.validation or {}
+    verdict = "✅ passée" if validation.get("passed") else "❌ échouée"
+    status_line = (f"**Stack** : `{state.stack}` · **Validation** : {verdict} "
+                   f"(cycle {validation.get('cycle', 0)}) · **Généré le** : {state.created_at}")
     readme = f"""# {idea.get('name', state.label)} — {biz.get('tagline', '')}
 
 {idea.get('one_liner', '')}
 
-**Stack** : `{state.stack}` · **Validation** : {'✅ passée' if validation.get('passed') else '❌ échouée'} (cycle {validation.get('cycle', 0)}) · **Généré le** : {state.created_at}
+{status_line}
 
 ## Lancer l'app
 
@@ -146,7 +154,8 @@ def _write_failure_report(state: RunState, step: str, error: str) -> None:
         "- `run.log` — journal complet du run",
     ]
     if state.validation:
-        lines.append("- `validation_report.json` — dernier rapport de validation (erreurs concrètes)")
+        lines.append("- `validation_report.json` — dernier rapport de validation "
+                     "(erreurs concrètes)")
         for s in state.validation.get("stages", []):
             if not s.get("passed"):
                 lines.append(f"  - ❌ {s['name']}: {s.get('detail', '')[:200]}")

@@ -163,9 +163,9 @@ async def _call(prompt: str, options: ClaudeAgentOptions, *, timeout: int, logge
             logger.info("✅ %s terminé en %.0fs (%d turns)",
                         label, time.time() - t0, result.num_turns)
             return result, text, usage
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise SDKTimeoutError(f"{label}: timeout après {timeout}s",
-                                  usage=wasted if wasted.cost_usd else None)
+                                  usage=wasted if wasted.cost_usd else None) from None
         except SDKResultError as e:
             if e.usage:
                 wasted.merge(e.usage)
@@ -206,7 +206,7 @@ async def run_structured(prompt: str, schema: dict, *, model: str, timeout: int,
 
 async def run_agentic(prompt: str, cwd, *, model: str, timeout: int, logger, label: str,
                       max_turns: int = 150, resume_session: str | None = None) -> StepUsage:
-    """Appel agentique (bypassPermissions dans cwd). error_max_turns → UNE continuation de session."""
+    """Appel agentique (bypassPermissions dans cwd) ; error_max_turns → UNE continuation."""
 
     def _options(resume: str | None) -> ClaudeAgentOptions:
         return ClaudeAgentOptions(

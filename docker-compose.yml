@@ -10,10 +10,17 @@ services:
       # Home Claude persistant : les refresh de token OAuth survivent entre invocations
       - ./data/claude:/home/usine/.claude
       - ${CLAUDE_CREDENTIALS}:/creds/.credentials.json:ro
+      # Source monté par-dessus la copie de l'image : les modifs de code sont prises en
+      # compte sans rebuild (rebuild seulement si requirements.txt ou Dockerfile changent)
+      - ./usine:/app/usine:ro
+      - ./templates:/app/templates:ro
+      - ./tests:/app/tests:ro
+      - ./pyproject.toml:/app/pyproject.toml:ro
     env_file: .env
     environment:
       PYTHONUNBUFFERED: "1"
       PYTHONIOENCODING: "utf-8"
+      PYTHONDONTWRITEBYTECODE: "1"  # le source est monté en lecture seule
       USINE_DOCKER_NETWORK: usine-net
     networks:
       - usine-net

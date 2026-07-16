@@ -1,0 +1,23 @@
+# Configuration qualité de l'usine (lint + tests). Exécution : .\check.ps1 (tout dans Docker).
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["output", "data"]
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle erreurs
+    "W",  # pycodestyle avertissements
+    "F",  # pyflakes
+    "I",  # isort (ordre des imports)
+    "UP", # pyupgrade (idiomes py312)
+    "B",  # flake8-bugbear (pièges classiques)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Le texte des prompts est plus lisible en lignes longues qu'éclaté en concaténations
+"usine/prompts.py" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

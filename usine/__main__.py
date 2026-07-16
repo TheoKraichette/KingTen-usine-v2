@@ -1,13 +1,16 @@
-"""Point d'entrée CLI : run / resume / report / list / clean / delete / open / stop / sdk-check."""
+"""Point d'entrée CLI : run / resume / status / report / list / clean / delete / open / stop
+/ doctor / sdk-check."""
 
 import argparse
 import sys
 
+from usine import __version__
 from usine.logging_setup import setup_logging
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(prog="usine", description="AI App Factory v2")
+    parser.add_argument("--version", action="version", version=f"usine {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_run = sub.add_parser("run", help="Lance N runs de génération d'apps")
@@ -33,7 +36,10 @@ def main() -> int:
                           help="Sortie JSON machine plutôt que markdown")
 
     sub.add_parser("list", help="Historique des runs")
+    sub.add_parser("status", help="Runs en cours : étape, durée, coût, dernière activité")
     sub.add_parser("clean", help="Supprime les conteneurs/images usine-app-* orphelins")
+    sub.add_parser("doctor", help="Diagnostic complet : Docker, disques, credentials, "
+                                  "templates, CA, Chromium")
 
     p_delete = sub.add_parser("delete", help="Supprime un run (dossier + base)")
     p_delete.add_argument("run_id")
@@ -54,6 +60,11 @@ def main() -> int:
     if args.command == "sdk-check":
         from usine.sdk_check import sdk_check
         return sdk_check()
+    if args.command == "doctor":
+        import asyncio
+
+        from usine.doctor import run_doctor
+        return asyncio.run(run_doctor())
 
     from usine import cli
 
@@ -66,6 +77,8 @@ def main() -> int:
         return cli.cmd_report(as_json=args.as_json)
     if args.command == "list":
         return cli.cmd_list()
+    if args.command == "status":
+        return cli.cmd_status()
     if args.command == "clean":
         return cli.cmd_clean()
     if args.command == "delete":
